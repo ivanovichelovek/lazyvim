@@ -217,7 +217,7 @@ end, { desc = "Format C/C++ with makebeautiful" })
 -- Competitive programming: compile & run tests
 vim.keymap.set("n", "<leader>rc", function()
   local file = vim.fn.expand("%:p")
-  vim.cmd("split | terminal ~/.local/bin/cp-test " .. vim.fn.shellescape(file))
+  vim.cmd("split | terminal ~/.config/nvim/scripts/cp-test " .. vim.fn.shellescape(file))
 end, { desc = "Run CP tests for current file" })
 
 -- Run current file with <leader>rx
@@ -229,7 +229,13 @@ vim.keymap.set("n", "<leader>rx", function()
   if ft == "cpp" or ft == "c" then
     local out = vim.fn.expand("%:p:r")
     local compiler = ft == "c" and "clang" or "clang++"
-    cmd = compiler .. " -o " .. vim.fn.shellescape(out) .. " " .. vim.fn.shellescape(file) .. " && " .. vim.fn.shellescape(out)
+    cmd = compiler
+      .. " -o "
+      .. vim.fn.shellescape(out)
+      .. " "
+      .. vim.fn.shellescape(file)
+      .. " && "
+      .. vim.fn.shellescape(out)
   elseif ft == "python" then
     cmd = "python3 " .. vim.fn.shellescape(file)
   else

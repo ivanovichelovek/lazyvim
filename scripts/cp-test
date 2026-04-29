@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Competitive programming test runner
+# Usage: cp-test <source_file>
+# Expects tests in <name>/<N>.in and <name>/<N>.out next to the source file
+
+set -euo pipefail
+
+cleanup() {
+    [ -n "${bin:-}" ] && rm -f "$bin"
+}
+trap cleanup EXIT
+
+src="$1"
+dir="$(dirname "$src")"
+name="$(basename "$src" .cpp)"
+name="$(basename "$name" .c)"
+bin="$dir/$name.bin"
+
+# Compile
+echo "=== Compiling $name ==="
+clang++ -std=c++23 -O2 -o "$bin" "$src" 2>&1
+if [ $? -ne 0 ]; then
+    echo "Compilation failed"
+    exit 1
+fi
+echo ""
+
+test_dir="$dir/tests"
+if [ ! -d "$test_dir" ]; then
+    echo "No test directory found: $test_dir"
+    echo "Create it with .in/.out files:"
+    echo "  $test_dir/1.in"
+    echo "  $test_dir/1.out"
+    exit 1
+fi
+
+passed=0
+failed=0
+total=0
+
+# Find all .in files sorted numerically
+for infile in $(ls "$test_dir"/*.in 2>/dev/null | sort -V); do
+    num="$(basename "$infile" .in)"
+    outfile="$test_dir/$num.out"
+    total=$((total + 1))
+
+    if [ ! -f "$outfile" ]; then
+        echo "Test $num: SKIP (no $num.out)"
+        continue
+    fi
+
+    # Run with 5s timeout
+    got=$(timeout 5s "$bin" < "$infile" 2>&1) || {
+        code=$?
+        if [ $code -eq 124 ]; then
+            echo "Test $num: TLE (>5s)"
+        else
+            echo "Test $num: RE (exit code $code)"
+        fi
+        failed=$((failed + 1))
+        continue
+    }
+
+    expected=$(cat "$outfile")
+
+    # Trim trailing whitespace/newlines for comparison
+    got_trimmed=$(echo "$got" | sed 's/[[:space:]]*$//')
+    exp_trimmed=$(echo "$expected" | sed 's/[[:space:]]*$//')
+
+    if [ "$got_trimmed" = "$exp_trimmed" ]; then
+        echo "Test $num: OK"
+        passed=$((passed + 1))
+    else
+        echo "Test $num: WA"
+        echo "  Expected:"
+        echo "$expected" | sed 's/^/    /'
+        echo "  Got:"
+        echo "$got" | sed 's/^/    /'
+        failed=$((failed + 1))
+    fi
+done
+
+if [ $total -eq 0 ]; then
+    echo "No tests found in $test_dir"
+    exit 1
+fi
+
+echo ""
+echo "=== Results: $passed/$total passed ==="
+if [ $failed -gt 0 ]; then
+    exit 1
+fi
